@@ -1,12 +1,13 @@
-"""Access trees (paper Sect. III-C).
+"""Hierarchical access trees (paper Sect. III-C).
 
-Every non-leaf node is a k-of-num threshold gate (AND = num-of-num, OR = 1-of-num);
-leaves are attributes. A `name` on a non-leaf node binds a piece of data to the
-policy of the subtree rooted there -- in Part 1 only the root carries data.
+Every non-leaf node is a k-of-num threshold gate and may carry a `name`: a named
+node is bound to one piece of data M_name, protected by the policy of the
+subtree rooted at it. Leaves are attributes.
 
-Example (the paper's motivating policy T_B):
+Example (paper Fig. 2 / motivating example):
 
-    T = And("taskX", Or("TeamA", "TeamB"), name="M")
+    T_A = Or("TeamA", "TeamB", name="MA")
+    T_B = And("taskX", T_A, name="MB")      # T_A is a part of T_B
 """
 
 import itertools
