@@ -20,7 +20,7 @@ All six algorithms of the paper are implemented:
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python demo.py            # the paper's motivating example, end to end
-.venv/bin/python -m pytest          # 22 tests, ~20 s
+.venv/bin/python -m pytest          # 25 tests, ~25 s
 .venv/bin/python bench.py --quick   # Sect. VI experiments (Figs. 8-15), small sweep (~1 min)
 .venv/bin/python bench.py           # paper-scale sweep, 10..100 attributes (~20 min, writes results/*.csv)
 .venv/bin/python plot.py            # results/*.csv -> results/fig*.png
@@ -91,21 +91,29 @@ report/             the study report (EH-CP-ABE Report.docx)
 ## A limitation of the paper's construction
 
 In Encrypt, a child's secret is a point on its parent's polynomial,
-`sigma_x = q_parent(index(x))`. A user who satisfies a gate `P` learns
-`e(g,g)^(r*beta*q_P(j))` for `k_P` indices `j`, and Lagrange interpolation in the exponent works at
-*any* point, so they can also compute `DecNode(x)` for every child `x` of `P` and decrypt `M_x`,
-even when their attributes do not satisfy `T_x`. So `M_x` is effectively protected by
-`T_x OR T_parent(x)`.
+`sigma_x = q_parent(index(x))`. A user who holds `k_P` points of `q_P` (one per satisfied child,
+plus the point at 0 if they already know `DecNode(P)`) can evaluate it at *any* index, because
+Lagrange interpolation in the exponent is not limited to 0. So they learn `DecNode(x)` for every
+child `x` of `P` and can decrypt `M_x` even when their attributes do not satisfy `T_x`. That value
+is in turn a point on `q_x`, so the effect compounds down the tree.
 
 - On the paper's Fig. 5 shape (`tests/fig5_tree`): a key with only `b1` recovers `M_D`, and a key
   with `{b1, a1}` recovers `M_C`.
+- Under `Or("g1", Threshold(2, "p1", "p2", X))`, a key with `{g1, p1}` recovers `M_X` while
+  satisfying neither `T_X` nor its parent's policy.
 - ExExtension with an OR root lets users of the new branch recover the original `M_A`.
 - InExtension case 1 lets users of the original `T_C` recover the newly attached `M_P`.
 
-Sub-policies are enforced exactly when every data-carrying node's parent is an AND gate (as in the
-paper's Sect. I example). `ehcpabe.analysis.leaking_nodes(tree)` lists the exposed nodes, and
-`decrypt_child_via_parent` is the attack; the `test_limitation_*` tests reproduce each case. The
-implementation follows the paper as written and does not try to fix this.
+A named node is protected by exactly its own policy only when every gate on the path from the
+root down to it is an AND gate (as in the paper's Sect. I example). The functions in
+`ehcpabe.analysis` cover this:
+- `leaking_nodes(tree)` lists the exposed nodes.
+- `recover_all(pp, sk, ct)` is the general attack: it returns everything a key can actually
+  decrypt.
+- `decrypt_child_via_parent` is the one-step version.
+
+The `test_limitation_*` tests reproduce each case. The implementation follows the paper as written
+and does not try to fix this.
 
 ## Benchmarks
 

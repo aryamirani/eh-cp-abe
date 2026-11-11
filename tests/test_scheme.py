@@ -5,7 +5,7 @@ from cryptography.exceptions import InvalidTag
 
 from ehcpabe import (And, NotAuthorized, Or, OwnerState, SecretKey, Threshold, decrypt, decrypt_all,
                      encrypt, ex_extend, in_extend, keygen, setup)
-from ehcpabe.analysis import decrypt_child_via_parent, leaking_nodes
+from ehcpabe.analysis import decrypt_child_via_parent, leaking_nodes, recover_all
 from ehcpabe.group import ORDER
 from ehcpabe.scheme import _interpolate, _poly_eval, lagrange_at_zero
 
@@ -224,3 +224,37 @@ def test_limitation_absent_under_and_parents(system):
     tree = And("taskX", Or("TeamA", "TeamB", name="M_A"), name="M_B")   # paper's Sect. I example
     assert leaking_nodes(tree) == []
     assert sorted(leaking_nodes(fig5_tree())) == ["MB", "MC", "MD"]
+
+
+def test_limitation_compounds_across_levels(system):
+    """OR grandparent gives sigma_P for free, so one more child of the 2-of-3 gate P exposes M_X
+    to a key that satisfies neither T_X nor T_P."""
+    pp, msk = system
+    x = And("c", "d", name="MX")
+    tree = Or("g1", Threshold(2, "p1", "p2", x, name="MP"), name="MG")
+    ct, _ = encrypt(pp, tree, {"MX": b"X", "MP": b"P", "MG": b"G"})
+    sk = keygen(pp, msk, {"g1", "p1"})
+    assert decrypt_all(pp, sk, ct) == {"MG": b"G"}                 # what the policies allow
+    assert recover_all(pp, sk, ct) == {"MG": b"G", "MP": b"P", "MX": b"X"}
+    assert sorted(leaking_nodes(tree)) == ["MP", "MX"]
+
+
+def test_limitation_through_unnamed_and_gate(system):
+    """The OR gate above an unnamed AND gate still exposes the named node below it."""
+    pp, msk = system
+    tree = Or("a", And("b", And("c", "d", name="MX")))
+    ct, _ = encrypt(pp, tree, {"MX": b"X"})
+    sk = keygen(pp, msk, {"a", "b"})
+    assert decrypt_all(pp, sk, ct) == {}
+    assert recover_all(pp, sk, ct) == {"MX": b"X"}
+    assert leaking_nodes(tree) == ["MX"]
+
+
+def test_recover_all_matches_policies_on_and_paths(system):
+    """With only AND gates above every named node, the attack recovers nothing extra."""
+    pp, msk = system
+    tree = And("taskX", Or("TeamA", "TeamB", name="M_A"), name="M_B")
+    ct, _ = encrypt(pp, tree, {"M_A": b"A", "M_B": b"B"})
+    for attrs in [{"TeamA"}, {"taskX"}, {"taskX", "TeamB"}]:
+        sk = keygen(pp, msk, attrs)
+        assert recover_all(pp, sk, ct) == decrypt_all(pp, sk, ct)
