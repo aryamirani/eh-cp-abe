@@ -59,6 +59,7 @@ tests/              correctness, access control, collusion, tampering, extension
 demo.py             walkthrough of the paper's Sect. I example
 bench.py            re-runs the Sect. VI experiments (Figs. 8-15)
 plot.py             draws the benchmark CSVs as figures
+report/             the study report (EH-CP-ABE Report.docx)
 ```
 
 ## How this maps to the paper, and where it differs
