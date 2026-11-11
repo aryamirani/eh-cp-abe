@@ -5,6 +5,7 @@ from cryptography.exceptions import InvalidTag
 
 from ehcpabe import (And, NotAuthorized, Or, OwnerState, SecretKey, Threshold, decrypt, decrypt_all,
                      encrypt, ex_extend, in_extend, keygen, setup)
+from ehcpabe.analysis import decrypt_child_via_parent, leaking_nodes
 from ehcpabe.group import ORDER
 from ehcpabe.scheme import _interpolate, _poly_eval, lagrange_at_zero
 
@@ -152,3 +153,74 @@ def test_owner_state_seal_roundtrip(system, encrypted):
     assert restored.polys == owner.polys and restored.keys == owner.keys
     ct2, _, _ = ex_extend(pp, ct, restored, 1, ["z"], {"MZ": b"Z"}, name="MZ")
     assert decrypt(pp, keygen(pp, msk, {"z"}), ct2, "MZ") == b"Z"
+
+
+def test_out_of_gate_external_extension(system, encrypted):
+    """2-of-3 new root: the old tree plus one new branch, or both new branches."""
+    pp, msk = system
+    ct, owner = encrypted
+    ct2, _, stats = ex_extend(pp, ct, owner, 2, [And("e1", "e2", name="ME"), "f"],
+                              {"ME": b"E", "MR": b"R"}, name="MR")
+    assert all(ct2.inner[u] == ct.inner[u] for u in ct.inner)
+    assert decrypt_all(pp, keygen(pp, msk, {"e1", "e2", "f"}), ct2) == {"ME": b"E", "MR": b"R"}
+    assert decrypt_all(pp, keygen(pp, msk, {"b1", "a1", "f"}), ct2) == \
+        {"MB": b"data B", "MA": b"data A", "MR": b"R"}
+    assert "MR" not in decrypt_all(pp, keygen(pp, msk, {"b1", "a1"}), ct2)
+
+
+def test_tampered_ciphertext_is_rejected(system, encrypted):
+    """(E, D) is AES-GCM and K_x binds C1 and C2, so a modified component fails to decrypt."""
+    pp, msk = system
+    ct, _ = encrypted
+    sk = keygen(pp, msk, {"c1", "c2"})
+    uid = ct.tree.find("MC").uid
+    c1, c2, c3 = ct.inner[uid]
+    for bad in [(c1, c2, c3[:-1] + bytes([c3[-1] ^ 1])),
+                (c1 * pp.egg, c2, c3)]:
+        forged = type(ct)(tree=ct.tree, inner={**ct.inner, uid: bad}, leaf=ct.leaf)
+        with pytest.raises(InvalidTag):
+            decrypt(pp, sk, forged, "MC")
+
+
+# ---- limitation of the paper's construction (see ehcpabe/analysis.py) -------------------
+
+def test_limitation_or_parent_reveals_named_child(system, encrypted):
+    """{b1} satisfies MB = b1 OR T_D but not T_D, yet recovers M_D (sigma_D = sigma_B)."""
+    pp, msk = system
+    ct, _ = encrypted
+    sk = keygen(pp, msk, {"b1"})
+    assert not ct.tree.find("MD").satisfied_by(sk.attrs)
+    assert decrypt_child_via_parent(pp, sk, ct, "MB", "MD") == b"data D"
+
+
+def test_limitation_threshold_parent_reveals_named_child(system, encrypted):
+    """{b1, a1} satisfies MA = 2-of-(MB, MC, a1) but not MC, yet recovers M_C."""
+    pp, msk = system
+    ct, _ = encrypted
+    sk = keygen(pp, msk, {"b1", "a1"})
+    assert not ct.tree.find("MC").satisfied_by(sk.attrs)
+    assert decrypt_child_via_parent(pp, sk, ct, "MA", "MC") == b"data C"
+
+
+def test_limitation_extensions(system, encrypted):
+    pp, msk = system
+    ct, owner = encrypted
+    # ExExtension with an OR root: a user of the new branch only recovers the original M_A.
+    ct2, _, _ = ex_extend(pp, ct, owner, 1, [And("e1", "e2", name="ME")], {"ME": b"E", "MR": b"R"},
+                          name="MR")
+    sk = keygen(pp, msk, {"e1", "e2"})
+    assert not ct2.tree.find("MA").satisfied_by(sk.attrs)
+    assert decrypt_child_via_parent(pp, sk, ct2, "MR", "MA") == b"data A"
+    # InExtension case 1: a user of the original T_C recovers the newly attached M_F.
+    ct3, _, _ = in_extend(pp, ct, owner, "MC", And("f1", "f2", name="MF"), {"MF": b"F"})
+    sk = keygen(pp, msk, {"c1", "c2"})
+    assert not ct3.tree.find("MF").satisfied_by(sk.attrs)
+    assert decrypt_child_via_parent(pp, sk, ct3, "MC", "MF") == b"F"
+
+
+def test_limitation_absent_under_and_parents(system):
+    """With AND parents only, satisfying a parent implies satisfying each child: nothing to leak."""
+    pp, msk = system
+    tree = And("taskX", Or("TeamA", "TeamB", name="M_A"), name="M_B")   # paper's Sect. I example
+    assert leaking_nodes(tree) == []
+    assert sorted(leaking_nodes(fig5_tree())) == ["MB", "MC", "MD"]

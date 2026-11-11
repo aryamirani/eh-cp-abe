@@ -2,7 +2,7 @@
 
 A working implementation of **Extendable Hierarchical Ciphertext-Policy Attribute-Based
 Encryption** from M. Xiao, H. Li, Q. Huang, S. Yu, W. Susilo, *"Attribute-Based Hierarchical
-Access Control With Extendable Policy"*, IEEE TIFS vol. 17, 2022 (`../p05.pdf`).
+Access Control With Extendable Policy"*, IEEE TIFS vol. 17, 2022 (`../paper/p05.pdf`).
 
 All six algorithms of the paper are implemented:
 
@@ -18,11 +18,12 @@ All six algorithms of the paper are implemented:
 ## Running
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install py_ecc cryptography pytest
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python demo.py            # the paper's motivating example, end to end
-.venv/bin/python -m pytest          # 16 tests, ~15 s
-.venv/bin/python bench.py --quick   # Sect. VI experiments, small sweep (~25 s)
-.venv/bin/python bench.py           # full sweep (writes results/*.csv)
+.venv/bin/python -m pytest          # 22 tests, ~20 s
+.venv/bin/python bench.py --quick   # Sect. VI experiments (Figs. 8-15), small sweep (~1 min)
+.venv/bin/python bench.py           # paper-scale sweep, 10..100 attributes (~20 min, writes results/*.csv)
+.venv/bin/python plot.py            # results/*.csv -> results/fig*.png
 ```
 
 ## Usage
@@ -53,9 +54,11 @@ check component by component which parts changed.
 ehcpabe/group.py    pairing group wrapper (BLS12-381 via py_ecc), H1, H2
 ehcpabe/policy.py   hierarchical access tree: Attr / And / Or / Threshold
 ehcpabe/scheme.py   the six algorithms, Lagrange interpolation, owner state
-tests/              correctness, access control, collusion, extension invariants
+ehcpabe/analysis.py the sub-policy leak described below (attack + affected-node check)
+tests/              correctness, access control, collusion, tampering, extension invariants, the leak
 demo.py             walkthrough of the paper's Sect. I example
-bench.py            re-runs the Sect. VI experiments
+bench.py            re-runs the Sect. VI experiments (Figs. 8-15)
+plot.py             draws the benchmark CSVs as figures
 ```
 
 ## How this maps to the paper, and where it differs
@@ -84,9 +87,29 @@ bench.py            re-runs the Sect. VI experiments
 - **Not production code.** py_ecc is pure Python and not constant-time. This is for studying and
   benchmarking the scheme, not for protecting real data.
 
+## A limitation of the paper's construction
+
+In Encrypt, a child's secret is a point on its parent's polynomial,
+`sigma_x = q_parent(index(x))`. A user who satisfies a gate `P` learns
+`e(g,g)^(r*beta*q_P(j))` for `k_P` indices `j`, and Lagrange interpolation in the exponent works at
+*any* point, so they can also compute `DecNode(x)` for every child `x` of `P` and decrypt `M_x`,
+even when their attributes do not satisfy `T_x`. So `M_x` is effectively protected by
+`T_x OR T_parent(x)`.
+
+- On the paper's Fig. 5 shape (`tests/fig5_tree`): a key with only `b1` recovers `M_D`, and a key
+  with `{b1, a1}` recovers `M_C`.
+- ExExtension with an OR root lets users of the new branch recover the original `M_A`.
+- InExtension case 1 lets users of the original `T_C` recover the newly attached `M_P`.
+
+Sub-policies are enforced exactly when every data-carrying node's parent is an AND gate (as in the
+paper's Sect. I example). `ehcpabe.analysis.leaking_nodes(tree)` lists the exposed nodes, and
+`decrypt_child_via_parent` is the attack; the `test_limitation_*` tests reproduce each case. The
+implementation follows the paper as written and does not try to fix this.
+
 ## Benchmarks
 
-See `results/` (CSV) after running `bench.py`; results from this machine are in `RESULTS.md`.
+See `results/` (CSV and `fig*.png`) after running `bench.py` and `plot.py`; results from this
+machine are in `RESULTS.md`.
 Absolute times are slower than the paper's Java numbers (pure-Python pairings on a larger curve),
 but the paper's comparisons can be checked directly:
 

@@ -1,3 +1,4 @@
 py_ecc>=8.0
 cryptography>=42
 pytest>=8
+matplotlib>=3.8   # plot.py only
