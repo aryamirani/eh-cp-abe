@@ -111,7 +111,6 @@ root down to it is an AND gate (as in the paper's Sect. I example). The function
 - `leaking_nodes(tree)` lists the exposed nodes.
 - `recover_all(pp, sk, ct)` is the general attack: it returns everything a key can actually
   decrypt.
-- `decrypt_child_via_parent` is the one-step version.
 
 The `test_limitation_*` tests reproduce each case. The implementation follows the paper as written
 and does not try to fix this.

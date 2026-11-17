@@ -31,29 +31,6 @@ from . import group as grp
 from .scheme import _dec_node, _sym_dec, lagrange
 
 
-def decrypt_child_via_parent(pp, sk, ct, parent_name, child_name):
-    """Recover M_child using only the fact that sk satisfies the parent gate.
-
-    Uses nothing but public ciphertext components and the user's own key.
-    """
-    parent = ct.tree.find(parent_name)
-    child = ct.tree.find(child_name)
-    idx = next(i for i, c in enumerate(parent.children, start=1) if c is child)
-    if not parent.satisfied_by(sk.attrs):
-        raise ValueError("this key does not satisfy the parent gate either")
-
-    chosen = [(i, c) for i, c in enumerate(parent.children, start=1)
-              if c.satisfied_by(sk.attrs)][:parent.k]
-    S = [i for i, _ in chosen]
-    memo, val = {}, grp.GT_ONE
-    for i, c in chosen:
-        val = val * _dec_node(c, sk, ct, memo) ** lagrange(i, S, idx)
-
-    c1, c2, c3 = ct.inner[child.uid]
-    r_hat = c1 * grp.final_exp(val * grp.miller(grp.neg(c2), sk.D))
-    return _sym_dec(grp.H2(c1, c2, r_hat), c3)
-
-
 def recover_all(pp, sk, ct):
     """Every message this key can recover from public data, by propagating polynomial points.
 

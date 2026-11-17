@@ -5,7 +5,7 @@ from cryptography.exceptions import InvalidTag
 
 from ehcpabe import (And, NotAuthorized, Or, OwnerState, SecretKey, Threshold, decrypt, decrypt_all,
                      encrypt, ex_extend, in_extend, keygen, setup)
-from ehcpabe.analysis import decrypt_child_via_parent, leaking_nodes, recover_all
+from ehcpabe.analysis import leaking_nodes, recover_all
 from ehcpabe.group import ORDER
 from ehcpabe.scheme import _interpolate, _poly_eval, lagrange
 
@@ -190,7 +190,7 @@ def test_limitation_or_parent_reveals_named_child(system, encrypted):
     ct, _ = encrypted
     sk = keygen(pp, msk, {"b1"})
     assert not ct.tree.find("MD").satisfied_by(sk.attrs)
-    assert decrypt_child_via_parent(pp, sk, ct, "MB", "MD") == b"data D"
+    assert recover_all(pp, sk, ct)["MD"] == b"data D"
 
 
 def test_limitation_threshold_parent_reveals_named_child(system, encrypted):
@@ -199,7 +199,7 @@ def test_limitation_threshold_parent_reveals_named_child(system, encrypted):
     ct, _ = encrypted
     sk = keygen(pp, msk, {"b1", "a1"})
     assert not ct.tree.find("MC").satisfied_by(sk.attrs)
-    assert decrypt_child_via_parent(pp, sk, ct, "MA", "MC") == b"data C"
+    assert recover_all(pp, sk, ct)["MC"] == b"data C"
 
 
 def test_limitation_extensions(system, encrypted):
@@ -210,12 +210,12 @@ def test_limitation_extensions(system, encrypted):
                           name="MR")
     sk = keygen(pp, msk, {"e1", "e2"})
     assert not ct2.tree.find("MA").satisfied_by(sk.attrs)
-    assert decrypt_child_via_parent(pp, sk, ct2, "MR", "MA") == b"data A"
+    assert recover_all(pp, sk, ct2)["MA"] == b"data A"
     # InExtension case 1: a user of the original T_C recovers the newly attached M_F.
     ct3, _, _ = in_extend(pp, ct, owner, "MC", And("f1", "f2", name="MF"), {"MF": b"F"})
     sk = keygen(pp, msk, {"c1", "c2"})
     assert not ct3.tree.find("MF").satisfied_by(sk.attrs)
-    assert decrypt_child_via_parent(pp, sk, ct3, "MC", "MF") == b"F"
+    assert recover_all(pp, sk, ct3)["MF"] == b"F"
 
 
 def test_limitation_absent_under_and_parents(system):
