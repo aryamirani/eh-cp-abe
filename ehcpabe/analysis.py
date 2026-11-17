@@ -28,16 +28,7 @@ hidden from holders of another sub-tree's key.
 """
 
 from . import group as grp
-from .scheme import _dec_node, _sym_dec, p
-
-
-def _lagrange_at(i, S, x):
-    num, den = 1, 1
-    for j in S:
-        if j != i:
-            num = num * (x - j) % p
-            den = den * (i - j) % p
-    return num * pow(den, -1, p) % p
+from .scheme import _dec_node, _sym_dec, lagrange
 
 
 def decrypt_child_via_parent(pp, sk, ct, parent_name, child_name):
@@ -56,7 +47,7 @@ def decrypt_child_via_parent(pp, sk, ct, parent_name, child_name):
     S = [i for i, _ in chosen]
     memo, val = {}, grp.GT_ONE
     for i, c in chosen:
-        val = val * _dec_node(c, sk, ct, memo) ** _lagrange_at(i, S, idx)
+        val = val * _dec_node(c, sk, ct, memo) ** lagrange(i, S, idx)
 
     c1, c2, c3 = ct.inner[child.uid]
     r_hat = c1 * grp.final_exp(val * grp.miller(grp.neg(c2), sk.D))
@@ -89,7 +80,7 @@ def recover_all(pp, sk, ct):
                 if n.uid not in known:
                     val = grp.GT_ONE
                     for i in S:
-                        val = val * pts[i] ** _lagrange_at(i, S, idx)
+                        val = val * pts[i] ** lagrange(i, S, idx)
                     known[n.uid] = val
                     changed = True
 

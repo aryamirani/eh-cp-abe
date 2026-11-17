@@ -42,12 +42,12 @@ def _random_poly(constant, degree):
     return [constant % p] + [grp.rand_scalar() for _ in range(degree)]
 
 
-def lagrange_at_zero(i, S):
-    """Delta_{i,S}(0) = prod_{j in S, j != i} (0 - j) / (i - j)  mod p."""
+def lagrange(i, S, x=0):
+    """Delta_{i,S}(x) = prod_{j in S, j != i} (x - j) / (i - j)  mod p."""
     num, den = 1, 1
     for j in S:
         if j != i:
-            num = num * (-j) % p
+            num = num * (x - j) % p
             den = den * (i - j) % p
     return num * pow(den, -1, p) % p
 
@@ -260,7 +260,7 @@ def _dec_node(node, sk, ct, memo):
         S = [i for i, _ in chosen]
         val = grp.GT_ONE
         for i, c in chosen:
-            val = val * _dec_node(c, sk, ct, memo) ** lagrange_at_zero(i, S)
+            val = val * _dec_node(c, sk, ct, memo) ** lagrange(i, S)
     memo[node.uid] = val
     return val
 

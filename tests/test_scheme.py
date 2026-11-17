@@ -7,7 +7,7 @@ from ehcpabe import (And, NotAuthorized, Or, OwnerState, SecretKey, Threshold, d
                      encrypt, ex_extend, in_extend, keygen, setup)
 from ehcpabe.analysis import decrypt_child_via_parent, leaking_nodes, recover_all
 from ehcpabe.group import ORDER
-from ehcpabe.scheme import _interpolate, _poly_eval, lagrange_at_zero
+from ehcpabe.scheme import _interpolate, _poly_eval, lagrange
 
 MSGS = {"MA": b"data A", "MB": b"data B", "MC": b"data C", "MD": b"data D"}
 
@@ -36,7 +36,7 @@ def test_polynomial_helpers():
     q = _interpolate(pts)
     assert all(_poly_eval(q, x) == y for x, y in pts)
     S = [1, 3, 4]
-    assert sum(lagrange_at_zero(i, S) * y for i, y in pts) % ORDER == q[0]
+    assert sum(lagrange(i, S) * y for i, y in pts) % ORDER == q[0]
 
 
 @pytest.mark.parametrize("attrs, expected", [
