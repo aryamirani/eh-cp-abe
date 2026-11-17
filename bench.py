@@ -201,8 +201,6 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true")
     ap.add_argument("--reps", type=int, default=None)
-    ap.add_argument("--big-mb", type=int, default=30,
-                    help="large-file size for the second Fig. 11 run (paper: 300 MB)")
     args = ap.parse_args()
     q = args.quick
     reps = args.reps or (1 if q else 3)
@@ -214,9 +212,8 @@ def main():
           f"mean of {reps} runs)", flush=True)
     bench_keygen_encrypt_decrypt(pp, msk, sweep, reps)
     bench_hierarchical_vs_separate(pp, files, 5, reps, PAYLOAD, "hierarchical_vs_separate.csv", "300 KB")
-    big = os.urandom((1 if q else args.big_mb) * 1024 * 1024)
-    bench_hierarchical_vs_separate(pp, files, 5, 1, big, "hierarchical_vs_separate_big.csv",
-                                   f"{len(big) // 2**20} MB")
+    big = os.urandom(30 * 1024 * 1024)   # paper uses 300 MB; 30 MB keeps 10 ciphertexts in memory
+    bench_hierarchical_vs_separate(pp, files, 5, 1, big, "hierarchical_vs_separate_big.csv", "30 MB")
     del big
     bench_extension_files(pp, 15 if q else 50, 5 if q else 10, 6 if q else 20, files, reps)
     bench_extension_attrs(pp, 15 if q else 50, 5 if q else 10, sweep, reps)
