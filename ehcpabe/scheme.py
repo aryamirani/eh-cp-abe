@@ -265,11 +265,16 @@ def _dec_node(node, sk, ct, memo):
     return val
 
 
-def _decrypt_at(node, sk, ct, memo):
+def _open(node, sk, ct, dec):
+    """M_x from DecNode(x) given in the Miller-loop domain."""
     c1, c2, c3 = ct.inner[node.uid]
     # C1 * DecNode(x) / e(C2, D) = R_hat, done with a single final exponentiation.
-    r_hat = c1 * grp.final_exp(_dec_node(node, sk, ct, memo) * grp.miller(grp.neg(c2), sk.D))
+    r_hat = c1 * grp.final_exp(dec * grp.miller(grp.neg(c2), sk.D))
     return _sym_dec(grp.H2(c1, c2, r_hat), c3)
+
+
+def _decrypt_at(node, sk, ct, memo):
+    return _open(node, sk, ct, _dec_node(node, sk, ct, memo))
 
 
 def decrypt(pp, sk, ct, name):

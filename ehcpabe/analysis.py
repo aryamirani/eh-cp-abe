@@ -28,7 +28,7 @@ hidden from holders of another sub-tree's key.
 """
 
 from . import group as grp
-from .scheme import _dec_node, _sym_dec, lagrange
+from .scheme import _dec_node, _open, lagrange
 
 
 def recover_all(pp, sk, ct):
@@ -64,9 +64,7 @@ def recover_all(pp, sk, ct):
     out = {}
     for node in ct.tree.internal_nodes():
         if node.name is not None and node.uid in known:
-            c1, c2, c3 = ct.inner[node.uid]
-            r_hat = c1 * grp.final_exp(known[node.uid] * grp.miller(grp.neg(c2), sk.D))
-            out[node.name] = _sym_dec(grp.H2(c1, c2, r_hat), c3)
+            out[node.name] = _open(node, sk, ct, known[node.uid])
     return out
 
 
