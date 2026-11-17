@@ -92,19 +92,12 @@ class SecretKey:
     D: tuple
     comps: dict        # attribute -> (D_i in G2, D'_i in G1)
 
-    def size_bytes(self):
-        return grp.SIZE_G2 + len(self.comps) * (grp.SIZE_G2 + grp.SIZE_G1)
-
 
 @dataclass
 class Ciphertext:
     tree: Node
     inner: dict        # uid -> (C1 in GT, C2 in G1, C3 bytes)
     leaf: dict         # uid -> (C_y in G1, C'_y in G2)
-
-    def size_bytes(self):
-        body = sum(grp.SIZE_GT + grp.SIZE_G1 + len(c3) for _, _, c3 in self.inner.values())
-        return body + len(self.leaf) * (grp.SIZE_G1 + grp.SIZE_G2)
 
 
 @dataclass

@@ -96,7 +96,3 @@ def H2(c1, c2, r_hat):
     h.update(ser_g1(c2))
     h.update(ser_gt(r_hat))
     return h.digest()
-
-
-# Compressed sizes, used only for reporting ciphertext/key sizes.
-SIZE_G1, SIZE_G2, SIZE_GT = 48, 96, 576

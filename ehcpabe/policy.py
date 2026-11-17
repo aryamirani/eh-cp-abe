@@ -50,12 +50,6 @@ class Node:
                 return n
         raise KeyError(f"no node named {name!r}")
 
-    def parent_of(self, target):
-        for n in self.walk():
-            if any(c is target for c in n.children):
-                return n
-        return None
-
     def satisfied_by(self, attrs):
         """T_x(gamma) = 1 ?"""
         if self.is_leaf:
